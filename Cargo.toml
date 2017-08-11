@@ -1,0 +1,8 @@
+[package]
+name = "i3switcher"
+version = "0.1.0"
+authors = ["rmiller"]
+
+[dependencies]
+i3ipc = "0.5.0"
+clap = "2"
