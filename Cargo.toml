@@ -1,7 +1,13 @@
 [package]
 name = "i3switcher"
 version = "0.1.0"
-authors = ["rmiller"]
+authors = ["Robin Miller"]
+readme = "README"
+repository = https://github.com/grenewode/i3switcher
+homepage = https://github.com/grenewode/i3switcher
+keywords = ['i3']
+license = "MIT"
+license-file = "LICENSE"
 
 [dependencies]
 i3ipc = "0.5.0"
