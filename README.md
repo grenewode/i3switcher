@@ -3,7 +3,7 @@ Provides a simple utility for switching workspaces in i3. Inspired somewhat by G
 
 Normally, i3 will not create new workspaces when switching to the prev/next workspaces. Further, workspaces without windows are automatically closed. This forces users to use a short cut like Win+n to switch to workspace n if it does not have a window on it.
 
-This switcher can switches simply by counting off workspaces. For example, if you currently have these workspaces:
+This tool switches simply by counting off workspaces. For example, if you currently have these workspaces active (ie, have windows on them):
 
 ```
 +-+-+-+
