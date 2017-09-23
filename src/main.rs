@@ -10,7 +10,7 @@ fn main() {
             clap::Arg::with_name("DIRECTION")
                 .required(true)
                 .help("Sets the direction switch in")
-                .possible_values(&["left", "right"]),
+                .possible_values(&["prev", "next"]),
         )
         .arg_from_usage(
             "-m, --move-container 'moves the container to the workspace'",
@@ -18,8 +18,8 @@ fn main() {
 
     let matches = app.get_matches();
     let direction = match matches.value_of("DIRECTION") {
-        Some("left") => -1,
-        Some("right") => 1,
+        Some("prev") => -1,
+        Some("next") => 1,
         _ => unreachable!(), // Clap should take care of this
     };
 
