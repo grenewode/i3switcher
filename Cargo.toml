@@ -10,5 +10,5 @@ keywords = ['i3']
 license-file = "LICENSE"
 
 [dependencies]
-i3ipc = "0.5.0"
+i3ipc = "0.8"
 clap = "2"
