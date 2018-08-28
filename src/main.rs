@@ -1,11 +1,57 @@
 extern crate clap;
 extern crate i3ipc;
-use i3ipc::I3Connection;
+use i3ipc::{reply::Workspace, I3Connection};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
     Prev,
     Next,
+}
+
+fn find_next(idx: usize, slice: &[Workspace], direction: Direction) -> String {
+    let search_iter: Box<Iterator<Item = &Workspace>> = match direction {
+        Direction::Next => Box::new(slice[idx..].iter()),
+        Direction::Prev => Box::new(slice[..=idx].iter().rev()),
+    };
+
+    let mut search_iter = search_iter.peekable();
+
+    loop {
+        match (search_iter.next(), search_iter.peek()) {
+            (Some(prev_workspace), Some(current_workspace)) => {
+                if direction == Direction::Next
+                    && prev_workspace.num != -1
+                    && prev_workspace.num + 1 < current_workspace.num
+                {
+                    break (prev_workspace.num + 1).to_string();
+                } else if direction == Direction::Prev
+                    && current_workspace.num != -1
+                    && prev_workspace.num - 1 > current_workspace.num
+                {
+                    break (prev_workspace.num - 1).to_string();
+                } else if !current_workspace.visible {
+                    break current_workspace.name.clone();
+                }
+            }
+            (Some(prev_workspace), None) => match direction {
+                Direction::Next => {
+                    break if prev_workspace.num == -1 {
+                        "1".to_string()
+                    } else {
+                        (prev_workspace.num + 1).to_string()
+                    }
+                }
+                Direction::Prev => {
+                    break if prev_workspace.num == -1 {
+                        break prev_workspace.name.clone();
+                    } else {
+                        (prev_workspace.num - 1).to_string()
+                    }
+                }
+            },
+            _ => unreachable!(),
+        }
+    }
 }
 
 fn main() {
@@ -21,8 +67,8 @@ fn main() {
 
     let matches = app.get_matches();
     let direction = match matches.value_of("DIRECTION") {
-        Some("prev") => -1,
-        Some("next") => 1,
+        Some("prev") => Direction::Prev,
+        Some("next") => Direction::Next,
         _ => unreachable!(), // Clap should take care of this
     };
 
@@ -31,36 +77,35 @@ fn main() {
     // establish a connection to i3 over a unix socket
     let mut i3 = I3Connection::connect().expect("Could not connect to running i3 instance");
 
-    let workspaces = i3
+    let (mut named_workspaces, mut numbered_workspaces): (Vec<_>, Vec<_>) = i3
         .get_workspaces()
         .expect("Could not get list of workspaces from i3")
-        .workspaces;
-
-    if let Some(current_workspace) = i3
-        .get_outputs()
-        .expect("Failed to get list of outputs from i3")
-        .outputs
+        .workspaces
         .into_iter()
-        .find(|output| output.active)
-        .and_then(|output| output.current_workspace)
-    {
-        println!("{}", current_workspace);
+        .partition(|workspace| workspace.num == -1);
 
-        let idx = workspaces.iter().find(|workspace| workspace.name == current_workspace).map(|workspace| workspace.num).expect("Could not find active workspace in the list of workspaces. This should not happen?");
+    // Make sure that the workspaces are in the correct order
+    named_workspaces.sort_by(|a, b| a.name.cmp(&b.name));
+    numbered_workspaces.sort_by_key(|workspace| workspace.num);
 
-        let mut next = idx + direction;
-        if next < 1 {
-            next = 1;
-        }
+    let mut workspaces = named_workspaces;
+    workspaces.extend(numbered_workspaces);
 
-        if move_container {
-            i3.run_command(&format!("move container to workspace {}", next))
-                .expect("Failed to move the container to the target workspace");
-        }
+    // println!("{:#?}", workspaces);
 
-        i3.run_command(&format!("workspace {}", next))
-            .expect("Failed to move to the target workspace");
-    } else {
-        panic!("Could not find active output?")
+    let (idx_focused_workspace, focused_workspace) = workspaces
+        .iter()
+        .enumerate()
+        .find(|(_, workspace)| workspace.focused)
+        .expect("Could not find a focused workspace");
+
+    let target = find_next(idx_focused_workspace, &workspaces, direction);
+
+    if move_container {
+        i3.run_command(&format!("move container to workspace {}", target))
+            .expect("Failed to move the container to the target workspace");
     }
+
+    i3.run_command(&format!("workspace {}", target))
+        .expect("Failed to move to the target workspace");
 }
