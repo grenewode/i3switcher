@@ -1,7 +1,7 @@
 [package]
 name = "i3switcher"
 description = "provides nicer behavior for workspace switching in i3"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Robin Miller"]
 readme = "README.md"
 repository = "https://github.com/grenewode/i3switcher"

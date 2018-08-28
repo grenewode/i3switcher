@@ -88,17 +88,17 @@ fn main() {
     named_workspaces.sort_by(|a, b| a.name.cmp(&b.name));
     numbered_workspaces.sort_by_key(|workspace| workspace.num);
 
+    // Merge the ordered lists of workspaces
     let mut workspaces = named_workspaces;
     workspaces.extend(numbered_workspaces);
 
-    // println!("{:#?}", workspaces);
-
-    let (idx_focused_workspace, focused_workspace) = workspaces
+    // find the index of the focused workspace
+    let idx_focused_workspace = workspaces
         .iter()
-        .enumerate()
-        .find(|(_, workspace)| workspace.focused)
+        .position(|workspace| workspace.focused)
         .expect("Could not find a focused workspace");
 
+    // find the name of the workspace to switch to
     let target = find_next(idx_focused_workspace, &workspaces, direction);
 
     if move_container {
