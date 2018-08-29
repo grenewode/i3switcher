@@ -19,13 +19,15 @@ fn find_next(idx: usize, slice: &[Workspace], direction: Direction) -> String {
     loop {
         match (search_iter.next(), search_iter.peek()) {
             (Some(prev_workspace), Some(current_workspace)) => {
+                println!("{} -> {}", prev_workspace.num, current_workspace.num);
+
                 if direction == Direction::Next
                     && prev_workspace.num != -1
                     && prev_workspace.num + 1 < current_workspace.num
                 {
                     break (prev_workspace.num + 1).to_string();
                 } else if direction == Direction::Prev
-                    && current_workspace.num != -1
+                    && prev_workspace.num != -1
                     && prev_workspace.num - 1 > current_workspace.num
                 {
                     break (prev_workspace.num - 1).to_string();
@@ -36,7 +38,7 @@ fn find_next(idx: usize, slice: &[Workspace], direction: Direction) -> String {
             (Some(prev_workspace), None) => match direction {
                 Direction::Next => {
                     break if prev_workspace.num == -1 {
-                        "1".to_string()
+                        "0".to_string()
                     } else {
                         (prev_workspace.num + 1).to_string()
                     }
@@ -93,9 +95,10 @@ fn main() {
     workspaces.extend(numbered_workspaces);
 
     // find the index of the focused workspace
-    let idx_focused_workspace = workspaces
+    let (idx_focused_workspace, focused_workspace) = workspaces
         .iter()
-        .position(|workspace| workspace.focused)
+        .enumerate()
+        .find(|(_, workspace)| workspace.focused)
         .expect("Could not find a focused workspace");
 
     // find the name of the workspace to switch to
@@ -108,4 +111,9 @@ fn main() {
 
     i3.run_command(&format!("workspace {}", target))
         .expect("Failed to move to the target workspace");
+
+    i3.run_command(&format!(
+        "move workspace to output \"{}\"",
+        focused_workspace.output
+    )).expect("Failed to move to the target workspace");
 }
