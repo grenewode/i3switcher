@@ -1,5 +1,6 @@
 extern crate clap;
 extern crate i3ipc;
+
 use i3ipc::{reply::Workspace, I3Connection};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -8,50 +9,17 @@ pub enum Direction {
     Next,
 }
 
-fn find_next(idx: usize, slice: &[Workspace], direction: Direction) -> String {
-    let search_iter: Box<Iterator<Item = &Workspace>> = match direction {
-        Direction::Next => Box::new(slice[idx..].iter()),
-        Direction::Prev => Box::new(slice[..=idx].iter().rev()),
-    };
+fn get_workspace(workspaces: &[Workspace], idx: usize) -> &Workspace {
+    workspaces.get(idx).expect("Could not determine target workspace")
+}
 
-    let mut search_iter = search_iter.peekable();
-
-    loop {
-        match (search_iter.next(), search_iter.peek()) {
-            (Some(prev_workspace), Some(current_workspace)) => {
-                println!("{} -> {}", prev_workspace.num, current_workspace.num);
-
-                if direction == Direction::Next
-                    && prev_workspace.num != -1
-                    && prev_workspace.num + 1 < current_workspace.num
-                {
-                    break (prev_workspace.num + 1).to_string();
-                } else if direction == Direction::Prev
-                    && prev_workspace.num != -1
-                    && prev_workspace.num - 1 > current_workspace.num
-                {
-                    break (prev_workspace.num - 1).to_string();
-                } else if !current_workspace.visible {
-                    break current_workspace.name.clone();
-                }
-            }
-            (Some(prev_workspace), None) => match direction {
-                Direction::Next => {
-                    break if prev_workspace.num == -1 {
-                        "0".to_string()
-                    } else {
-                        (prev_workspace.num + 1).to_string()
-                    }
-                }
-                Direction::Prev => {
-                    break if prev_workspace.num == -1 {
-                        break prev_workspace.name.clone();
-                    } else {
-                        (prev_workspace.num - 1).to_string()
-                    }
-                }
-            },
-            _ => unreachable!(),
+fn find_next(idx: usize, workspaces: &[Workspace], direction: Direction) -> String {
+    match (idx, direction) {
+        (0, Direction::Prev) => get_workspace(workspaces, idx).name.clone(),
+        (_, Direction::Prev) => get_workspace(workspaces, idx - 1).name.clone(),
+        (_, Direction::Next) => match workspaces.get(idx + 1) {
+            Some(target) => target.name.clone(),
+            None => (get_workspace(workspaces, idx).num + 1).to_string(),
         }
     }
 }
@@ -103,6 +71,7 @@ fn main() {
 
     // find the name of the workspace to switch to
     let target = find_next(idx_focused_workspace, &workspaces, direction);
+    if target == focused_workspace.name { std::process::exit(0) }
 
     if move_container {
         i3.run_command(&format!("move container to workspace {}", target))
