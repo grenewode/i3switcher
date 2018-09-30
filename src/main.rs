@@ -9,17 +9,39 @@ pub enum Direction {
     Next,
 }
 
-fn get_workspace(workspaces: &[Workspace], idx: usize) -> &Workspace {
-    workspaces.get(idx).expect("Could not determine target workspace")
-}
+fn find_next(current_idx: usize, workspaces: &[Workspace], direction: Direction) -> Option<String> {
+    match (current_idx, direction) {
+        // If we are the first workspace, we don't need to move anywere, so don't do anything
+        (0, Direction::Prev) => None,
+        (_, Direction::Prev) => {
+            match workspaces
+                .iter()
+                .rev()
+                .skip(workspaces.len() - current_idx)
+                .find(|workspace| !workspace.visible)
+            {
+                Some(target) => Some(target.name.clone()),
+                // If we couldn't find a workspace that's not already visible before idx,
+                // then don't move
+                None => None,
+            }
+        }
+        (_, Direction::Next) => {
+            let last_workspace = workspaces
+                .iter()
+                .last()
+                .expect("Could not find last workspace");
 
-fn find_next(idx: usize, workspaces: &[Workspace], direction: Direction) -> String {
-    match (idx, direction) {
-        (0, Direction::Prev) => get_workspace(workspaces, idx).name.clone(),
-        (_, Direction::Prev) => get_workspace(workspaces, idx - 1).name.clone(),
-        (_, Direction::Next) => match workspaces.get(idx + 1) {
-            Some(target) => target.name.clone(),
-            None => (get_workspace(workspaces, idx).num + 1).to_string(),
+            match workspaces
+                .iter()
+                .skip(current_idx)
+                .find(|workspace| !workspace.visible)
+            {
+                Some(target) => Some(target.name.clone()),
+                // If we couldn't find a workspace that's not already visible,
+                // create a new one after the last workspace
+                None => Some((last_workspace.num + 1).to_string()),
+            }
         }
     }
 }
@@ -70,19 +92,18 @@ fn main() {
         .expect("Could not find a focused workspace");
 
     // find the name of the workspace to switch to
-    let target = find_next(idx_focused_workspace, &workspaces, direction);
-    if target == focused_workspace.name { std::process::exit(0) }
+    if let Some(target) = find_next(idx_focused_workspace, &workspaces, direction) {
+        if move_container {
+            i3.run_command(&format!("move container to workspace {}", target))
+                .expect("Failed to move the container to the target workspace");
+        }
 
-    if move_container {
-        i3.run_command(&format!("move container to workspace {}", target))
-            .expect("Failed to move the container to the target workspace");
+        i3.run_command(&format!("workspace {}", target))
+            .expect("Failed to move to the target workspace");
+
+        i3.run_command(&format!(
+            "move workspace to output \"{}\"",
+            focused_workspace.output
+        )).expect("Failed to move to the target workspace");
     }
-
-    i3.run_command(&format!("workspace {}", target))
-        .expect("Failed to move to the target workspace");
-
-    i3.run_command(&format!(
-        "move workspace to output \"{}\"",
-        focused_workspace.output
-    )).expect("Failed to move to the target workspace");
 }
