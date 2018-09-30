@@ -14,16 +14,39 @@ fn find_next(current_idx: usize, workspaces: &[Workspace], direction: Direction)
         // If we are the first workspace, we don't need to move anywere, so don't do anything
         (0, Direction::Prev) => None,
         (_, Direction::Prev) => {
-            match workspaces
-                .iter()
-                .rev()
-                .skip(workspaces.len() - current_idx)
-                .find(|workspace| !workspace.visible)
-            {
+            let mut iter = workspaces.iter().rev().skip(workspaces.len() - current_idx);
+
+            match iter.clone().find(|workspace| !workspace.visible) {
                 Some(target) => Some(target.name.clone()),
                 // If we couldn't find a workspace that's not already visible before idx,
-                // then don't move
-                None => None,
+                // then try to create a new workspace before the current one, but after the named
+                // workspaces
+                None => match iter
+                    // Filter out all the named workspaces, which have num < 0
+                    .filter(|workspace| workspace.num >= 0)
+                    .last()
+                {
+                    // If the last workspace has a num > 0, then we can create a new workspace
+                    // before it
+                    Some(last) => if last.num > 0 {
+                        Some((last.num - 1).to_string())
+                    } else {
+                        // Otherwise, we can't move anywere without changing what screens things
+                        // are on, so don't move
+                        None
+                    },
+                    // There are no other workspaces, so we are the lowest
+                    None => if workspaces[current_idx].num > 0 {
+                        // We are not the last workspace before the named workspaces start, and
+                        // there are no others, so we can create a new one and move to it
+                        Some((workspaces[current_idx].num - 1).to_string())
+                    } else {
+                        // We are the 0th workspace, so we can't create any new ones, and we can't move
+                        // to the named ones because that move change what screen they're on, or they
+                        // don't exist, so we don't do anything
+                        None
+                    },
+                },
             }
         }
         (_, Direction::Next) => {
