@@ -1,5 +1,6 @@
 extern crate clap;
 extern crate i3ipc;
+
 use i3ipc::{reply::Workspace, I3Connection};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -8,50 +9,62 @@ pub enum Direction {
     Next,
 }
 
-fn find_next(idx: usize, slice: &[Workspace], direction: Direction) -> String {
-    let search_iter: Box<Iterator<Item = &Workspace>> = match direction {
-        Direction::Next => Box::new(slice[idx..].iter()),
-        Direction::Prev => Box::new(slice[..=idx].iter().rev()),
-    };
+fn find_next(current_idx: usize, workspaces: &[Workspace], direction: Direction) -> Option<String> {
+    match (current_idx, direction) {
+        // If we are the first workspace, we don't need to move anywere, so don't do anything
+        (0, Direction::Prev) => None,
+        (_, Direction::Prev) => {
+            let mut iter = workspaces.iter().rev().skip(workspaces.len() - current_idx);
 
-    let mut search_iter = search_iter.peekable();
-
-    loop {
-        match (search_iter.next(), search_iter.peek()) {
-            (Some(prev_workspace), Some(current_workspace)) => {
-                println!("{} -> {}", prev_workspace.num, current_workspace.num);
-
-                if direction == Direction::Next
-                    && prev_workspace.num != -1
-                    && prev_workspace.num + 1 < current_workspace.num
+            match iter.clone().find(|workspace| !workspace.visible) {
+                Some(target) => Some(target.name.clone()),
+                // If we couldn't find a workspace that's not already visible before idx,
+                // then try to create a new workspace before the current one, but after the named
+                // workspaces
+                None => match iter
+                    // Filter out all the named workspaces, which have num < 0
+                    .filter(|workspace| workspace.num >= 0)
+                    .last()
                 {
-                    break (prev_workspace.num + 1).to_string();
-                } else if direction == Direction::Prev
-                    && prev_workspace.num != -1
-                    && prev_workspace.num - 1 > current_workspace.num
-                {
-                    break (prev_workspace.num - 1).to_string();
-                } else if !current_workspace.visible {
-                    break current_workspace.name.clone();
-                }
+                    // If the last workspace has a num > 0, then we can create a new workspace
+                    // before it
+                    Some(last) => if last.num > 0 {
+                        Some((last.num - 1).to_string())
+                    } else {
+                        // Otherwise, we can't move anywere without changing what screens things
+                        // are on, so don't move
+                        None
+                    },
+                    // There are no other workspaces, so we are the lowest
+                    None => if workspaces[current_idx].num > 0 {
+                        // We are not the last workspace before the named workspaces start, and
+                        // there are no others, so we can create a new one and move to it
+                        Some((workspaces[current_idx].num - 1).to_string())
+                    } else {
+                        // We are the 0th workspace, so we can't create any new ones, and we can't move
+                        // to the named ones because that move change what screen they're on, or they
+                        // don't exist, so we don't do anything
+                        None
+                    },
+                },
             }
-            (Some(prev_workspace), None) => match direction {
-                Direction::Next => {
-                    break if prev_workspace.num == -1 {
-                        "0".to_string()
-                    } else {
-                        (prev_workspace.num + 1).to_string()
-                    }
-                }
-                Direction::Prev => {
-                    break if prev_workspace.num == -1 {
-                        break prev_workspace.name.clone();
-                    } else {
-                        (prev_workspace.num - 1).to_string()
-                    }
-                }
-            },
-            _ => unreachable!(),
+        }
+        (_, Direction::Next) => {
+            let last_workspace = workspaces
+                .iter()
+                .last()
+                .expect("Could not find last workspace");
+
+            match workspaces
+                .iter()
+                .skip(current_idx)
+                .find(|workspace| !workspace.visible)
+            {
+                Some(target) => Some(target.name.clone()),
+                // If we couldn't find a workspace that's not already visible,
+                // create a new one after the last workspace
+                None => Some((last_workspace.num + 1).to_string()),
+            }
         }
     }
 }
@@ -102,18 +115,18 @@ fn main() {
         .expect("Could not find a focused workspace");
 
     // find the name of the workspace to switch to
-    let target = find_next(idx_focused_workspace, &workspaces, direction);
+    if let Some(target) = find_next(idx_focused_workspace, &workspaces, direction) {
+        if move_container {
+            i3.run_command(&format!("move container to workspace {}", target))
+                .expect("Failed to move the container to the target workspace");
+        }
 
-    if move_container {
-        i3.run_command(&format!("move container to workspace {}", target))
-            .expect("Failed to move the container to the target workspace");
+        i3.run_command(&format!("workspace {}", target))
+            .expect("Failed to move to the target workspace");
+
+        i3.run_command(&format!(
+            "move workspace to output \"{}\"",
+            focused_workspace.output
+        )).expect("Failed to move to the target workspace");
     }
-
-    i3.run_command(&format!("workspace {}", target))
-        .expect("Failed to move to the target workspace");
-
-    i3.run_command(&format!(
-        "move workspace to output \"{}\"",
-        focused_workspace.output
-    )).expect("Failed to move to the target workspace");
 }
