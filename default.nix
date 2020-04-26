@@ -1,26 +1,19 @@
-{
-  system ? builtins.currentSystem,
-  nixpkgsMozilla ? builtins.fetchGit {
-    url = https://github.com/mozilla/nixpkgs-mozilla;
-    rev = "50bae918794d3c283aeb335b209efd71e75e3954";
-  },
-  cargo2nix ? builtins.fetchGit {
-    url = https://github.com/tenx-tech/cargo2nix;
-    ref = "v0.8.2";
-  },
-}: let
-  rustOverlay = import "${nixpkgsMozilla}/rust-overlay.nix";
-  cargo2nixOverlay = import "${cargo2nix}/overlay";
+{ pkgs ? import <nixpkgs> {}, ... }:
+with pkgs;
+rustPlatform.buildRustPackage rec {
+  name = "i3switcher-${version}";
+  version = "0.3.1";
+  src = ./.;
+  buildInputs = [ pkgs.libzip ];
 
-  pkgs = import <nixpkgs> {
-    inherit system;
-    overlays = [ rustOverlay cargo2nixOverlay ];
-  };
+  checkPhase = "";
+  cargoSha256 = "sha256:0719871frl9yh1jzbyg39fwf8qzs4ngbsqq38rr5w9a03scqi5j6";
 
-  rustPkgs = pkgs.rustBuilder.makePackageSet' {
-    rustChannel = "stable";
-    packageFun = import ./Cargo.nix;
-    # packageOverrides = pkgs: pkgs.rustBuilder.overrides.all; # Implied, if unspecified
+  meta = with stdenv.lib; {
+    description = "provides nicer behavior for workspace switching in i3";
+    homepage = https://github.com/grenewode/i3switcher;
+    license = licenses.isc;
+    maintainers = [];
+    platforms = platforms.all;
   };
-in
-  rustPkgs.workspace.i3switcher {}
+}
