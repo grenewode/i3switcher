@@ -7,7 +7,7 @@ rustPlatform.buildRustPackage rec {
   buildInputs = [ pkgs.libzip ];
 
   checkPhase = "";
-  cargoSha256 = "sha256:1wxl3vn6sd0ak7qaaywdasli54msgf8fyqxi7hg0k6bdbnvnr76i";
+  cargoSha256 = "sha256:0ckscb2vrykzcpxib4mq2b40hf0xa80ix7n3v80nfdcbm9d0zwfi";
 
   meta = with stdenv.lib; {
     description = "provides nicer behavior for workspace switching in i3";
