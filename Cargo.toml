@@ -1,14 +1,18 @@
 [package]
 name = "i3switcher"
-description = "provides nicer behavior for workspace switching in i3"
+description = "Provides various methods for switching workspaces in i3 and sway. In particular, provides a tools for auto-creating new workspaces as they are needed, similar to GNOME shell."
 version = "0.3.1"
-authors = ["Robin Miller"]
+authors = ["grenewode"]
 readme = "README.md"
 repository = "https://github.com/grenewode/i3switcher"
 homepage = "https://github.com/grenewode/i3switcher"
-keywords = ['i3']
+keywords = ['i3', 'sway']
 license-file = "LICENSE"
+edition = "2021"
 
 [dependencies]
 i3ipc = "0.8"
-clap = "2"
+structopt = { version = "0.3", features = [ "paw" ] }
+paw = "1.0"
+derive_more = "0.99.17"
+parse-display = "0.5.3"
