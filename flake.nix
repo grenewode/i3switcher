@@ -2,28 +2,24 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nmattia/naersk";
-    mozillapkgs = {
-      url = "github:mozilla/nixpkgs-mozilla";
-      flake = false;
-    };
+    rust-overlay.url = "github:oxalica/rust-overlay";
     rust-analyzer = {
       url = "github:grenewode/rust-analyzer-flake";
       inputs.naersk.follows = "naersk";
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, naersk, mozillapkgs, rust-analyzer }:
+  outputs = { self, nixpkgs, flake-utils, naersk, rust-overlay, rust-analyzer }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
-        mozilla = pkgs.callPackage (mozillapkgs + "/package-set.nix") { };
-        channel = (mozilla.rustChannelOf {
-          rustToolchain = ./rust-toolchain.toml;
-          hash = pkgs.lib.fakeHash;
-        });
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlay ];
+        };
+        rust = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
         naersk-lib = naersk.lib."${system}".override {
-          cargo = channel.rust;
-          rustc = channel.rust;
+          cargo = rust;
+          rustc = rust;
         };
         defaultPackage = naersk-lib.buildPackage { root = ./.; };
         defaultPackageName = (builtins.parseDrvName defaultPackage.name).name;
@@ -32,7 +28,6 @@
         packages = {
           ${defaultPackageName} = defaultPackage;
         } // {
-          inherit (channel) rust;
           inherit (rust-analyzer.packages.${system}) rust-analyzer;
         };
         inherit defaultPackage;
@@ -46,8 +41,9 @@
         devShell = pkgs.mkShell {
           buildInputs = (with pkgs; [ openssl ]);
           nativeBuildInputs = [
-            channel.rust
-            channel.rust-src
+            (rust.override {
+              extensions = [ "rust-src" "clippy-preview" "rustfmt-preview" ];
+            })
             self.packages.${system}.rust-analyzer
           ] ++ (with pkgs; [ pkg-config ]);
         };
